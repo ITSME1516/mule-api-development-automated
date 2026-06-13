@@ -1,4 +1,5 @@
 import uuid
+from urllib.parse import urlparse
 
 class utils:
     """
@@ -11,6 +12,14 @@ class utils:
         joinPath(endpoint, separator): Joins last 3 parts of a path with a separator.
         disablePayloadProp(endpoint, separator): Builds a log property string.
     """
+
+    ##############################################
+    #########                            #########
+    ######     Common Utility Methods      ######
+    #########                            #########
+    ##############################################
+
+    # Slash Check: Remove leading slash if present
     def slashCheck(self, endpoint: str) -> str:
         """
         Remove leading slash from the endpoint if it exists.
@@ -25,7 +34,8 @@ class utils:
             return endpoint[1:]
         else:
             return endpoint
-        
+    
+    # Slash Converter: Convert forward slashes to backslashes
     def slashConverter(self, endpoint: str) -> str:
         """
         Convert forward slashes to backslashes in the endpoint.
@@ -34,10 +44,11 @@ class utils:
             endpoint (str): The API endpoint string (e.g., "/a/b/c").
 
         Returns:
-            str: Endpoint with backslashes (e.g., "\a\b\c").
+            str: Endpoint with backslashes (e.g., "\\a\\b\\c").
         """
         return endpoint.replace("/", "\\")
 
+    # UUID Generation: Generate a unique identifier
     def createUuid(self) -> str:
         """
         Generate a random UUID string.
@@ -47,6 +58,7 @@ class utils:
         """
         return str(uuid.uuid4())
 
+    # Join Path: Join last 3 parts of the endpoint with a separator
     def joinPath(self, endpoint: str, separator: str = ".") -> str:
         """
         Join the last 3 parts of the endpoint path using a separator.
@@ -61,6 +73,7 @@ class utils:
         endpointSplit= [p for p in endpoint.split("/")[-3:] if p] 
         return separator.join(endpointSplit)
     
+    # Disable Payload Property: Build a log property string for disabling payload logs
     def disablePayloadProp(self, endpoint: str, separator: str = ".") -> str:
         """
         Build a log property string for disabling payload logs.
@@ -75,6 +88,28 @@ class utils:
         result = self.joinPath(endpoint, separator)
         return result + ".disable.payload.logs"
 
+    # Get Backend Details
+    def getBackendDetails(self, backendURL, backendType):
+        if(backendType == "request"):
+            return urlparse(backendURL)
+        else:
+            raise ValueError("Define proper backend type")
+            
+    # Get CallingFunction
+    def sysLoggerMessage(self, backendURL, backendType):
+        if (backendType == "request"):
+            return f"{urlparse(backendURL).path}"
+        else:
+            raise ValueError("Define proper backend type")
+        
+        
+    ##############################################
+    #########                            #########
+    ###### Flow Name & File Name Generation ######
+    #########                            #########
+    ##############################################
+
+    # Implementation Flow Name: Generate a standardized implementation flow name
     def implFlowName(self, endpoint: str) -> str:
         """
         Generate a standardized implementation flow name for MuleSoft subflows.
@@ -93,6 +128,7 @@ class utils:
         """
         return f"impl-{self.joinPath(endpoint, "-")}-subflow"
     
+    # Implementation File Name: Generate a standardized implementation file name
     def implFileName(self, endpoint: str) -> str:
         """
         Generate a standardized implementation file name for MuleSoft subflows.
@@ -110,3 +146,112 @@ class utils:
             'impl-c-d-e-flows'
         """
         return f"impl-{self.joinPath(endpoint, "-")}-flows.xml"
+                
+    # System File Name: Generate a standardized system file name
+    def sysFileName(self, backendUrl: str, backendType: str) -> str:
+        return f"{self.getBackendDetails(backendUrl, backendType).hostname}-flows.xml"
+
+    # System Flow Name: Generate a standardized system flow name
+    def sysFlowName(self,backendUrl: str , endpoint: str, backendType: str) -> str:
+        return f"{self.getBackendDetails(backendUrl, backendType).hostname}-api-{self.joinPath(endpoint, "-")}-subflow"
+    
+
+    ################################################
+    #########                              #########
+    ######      Connector Preparation         ######
+    #########                              #########
+    ################################################
+
+    def prepareHttpConnector(self, backendUrl: str,endpoint: str, method: str = "POST", backendType: str = "request") -> str:
+        """
+        Prepare the HTTP connector configuration for MuleSoft.
+
+        Parameters:
+            backendUrl (str): The backend URL (e.g., "http://backend-service/api").
+            endpoint (str): The API endpoint path (e.g., "/a/b/c").
+            method (str): The HTTP method (default is "POST").
+            backendType (str): The type of the backend (default is "request").
+
+        Returns:
+            str: A formatted MuleSoft HTTP connector configuration string.
+
+        Example:
+            >>> utilsObj = Utils()
+            >>> config = utilsObj.prepareHttpConnector("http://backend-service/api")
+            >>> print(config)
+            <http:request-config name="http-request-config" ...>
+                ...
+            </http:request-config>
+        """
+        http_connector_config = f"""
+        <http:request method="${method}" doc:name="Request to {self.sysLoggerMessage(backendUrl, backendType)}"  doc:id="{self.createUuid()}" config-ref="HTTP_Request_configuration_{self.getBackendDetails(backendUrl, 'request').hostname}-config" path='${{{self.backendPropName(backendUrl, 'request', endpoint).get('path')}}}' >
+			<http:headers ><![CDATA[#[%dw 2.0
+output application/json
+---
+{{}}]]]></http:headers>
+		</http:request>
+        """
+        return http_connector_config
+    
+    ################################################
+    #########                              #########
+    ######      property name generation      ######
+    #########                              #########
+    ################################################
+
+    def backendPropName(self, backendUrl: str, backendType: str, endpoint: str) -> dict:
+        """
+        Generate a standardized property name for backend configurations.
+
+        Parameters:
+            backendUrl (str): The backend URL (e.g., "http://backend-service/api").
+            backendType (str): The type of property (e.g., "request").
+            endpoint (str): The API endpoint path (e.g., "/a/b/c").
+
+        Returns:
+            dict: A dictionary of standardized property names.
+
+        Example:
+            >>> utilsObj = Utils()
+            >>> propName = utilsObj.backendPropName("http://backend-service/api", "request", "/a/b/c")
+            >>> print(propName)
+            'backend-service-request-config'
+        """
+        result  = {
+            "protocol": f"{self.getBackendDetails(backendUrl, backendType).hostname}.protocol",
+            "hostname": f"{self.getBackendDetails(backendUrl, backendType).hostname}.hostname",
+            "port": f"{self.getBackendDetails(backendUrl, backendType).hostname}.port",
+            "basePath": f"{self.getBackendDetails(backendUrl, backendType).hostname}.basePath",
+            "path": f"{self.getBackendDetails(backendUrl, backendType).hostname}.{self.joinPath(endpoint, '.')}.path",
+            "connectionTimeout": f"{self.getBackendDetails(backendUrl, backendType).hostname}.connectionTimeout",
+            "responseTimeout": f"{self.getBackendDetails(backendUrl, backendType).hostname}.responseTimeout",
+            "usePersistentConnections": f"{self.getBackendDetails(backendUrl, backendType).hostname}.usePersistentConnections",
+            "insecure": f"{self.getBackendDetails(backendUrl, backendType).hostname}.insecure",
+        }
+        return result
+    
+
+
+    ################################################
+    #########                              #########
+    ######            Default File            ######
+    #########                              #########
+    ################################################
+
+    def defaultFile(self, backendType: str, flowCode: str) -> str:
+        if backendType == "request":
+            result = f"""<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" 
+    xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" 
+    xmlns="http://www.mulesoft.org/schema/mule/core" 
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+{flowCode}
+</mule>
+            """
+            return result
+        else:
+            raise ValueError("Define proper backend type")
+    
