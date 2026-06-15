@@ -1,5 +1,6 @@
 import uuid
 from urllib.parse import urlparse
+import xml.etree.ElementTree as ET
 
 class utils:
     """
@@ -13,12 +14,32 @@ class utils:
         disablePayloadProp(endpoint, separator): Builds a log property string.
     """
 
+    def __init__(self):
+        self.ns = {
+            'http': 'http://www.mulesoft.org/schema/mule/http',
+            'ee': 'http://www.mulesoft.org/schema/mule/ee/core',
+            'core': 'http://www.mulesoft.org/schema/mule/core'
+        }
+
     ##############################################
     #########                            #########
     ######     Common Utility Methods      ######
     #########                            #########
     ##############################################
 
+    # Get Package Name: Extract the last part of the endpoint path
+    def getPackageName(self, projectPath: str) -> str:
+        """
+        Extract the last part of the project path.
+
+        Parameters:
+            projectPath (str): The path to the project directory.
+
+        Returns:
+            str: The last part of the project path.
+        """
+        return projectPath.split("\\")[-1]
+    
     # Slash Check: Remove leading slash if present
     def slashCheck(self, endpoint: str) -> str:
         """
@@ -95,13 +116,44 @@ class utils:
         else:
             raise ValueError("Define proper backend type")
             
-    # Get CallingFunction
+    # Get backend endpoint for logger message
     def sysLoggerMessage(self, backendURL, backendType):
         if (backendType == "request"):
             return f"{urlparse(backendURL).path}"
         else:
             raise ValueError("Define proper backend type")
-        
+    
+    # Find is the backend configuration is existing or new
+    def isExistingBackend(self, projectPath: str, backendUrl: str, backendType: str) -> bool:
+        """
+        Determine if the backend configuration is existing or new.
+
+        Parameters:
+            projectPath (str): The path to the project directory.
+            backendUrl (str): The backend URL (e.g., "http://backend-service/api").
+            backendType (str): The type of the backend (e.g., "request").
+
+        Returns:
+            bool: True if existing, False if new.
+        """
+        if backendType == "request":
+            with open(f"{projectPath}\\src\\main\\mule\\common\\global-config.xml", 'r') as file:
+                content = file.read()
+                data = ET.fromstring(content).findall("http:request-config", self.ns)
+            httpRequestConfigNames = [config.get("name") for config in data]
+            result = any([self.getBackendDetails(backendUrl, backendType).hostname in configName for configName in httpRequestConfigNames])
+            return result
+        else:
+            raise ValueError("Define proper backend type")
+    
+    # Find the main flow existing or new
+    def isExistingMainFlow(self, projectPath: str, endpoint: str) -> bool:
+        with open(f"{projectPath}\\src\\main\\mule\\{self.getPackageName(projectPath)}.xml", 'r') as file:
+            content = file.read()
+            data = ET.fromstring(content).findall("flow", self.ns)
+        flowNames = [flow.get("name") for flow in data]
+        result = any([self.implFlowName(endpoint) in flowName for flowName in flowNames])
+        return result
         
     ##############################################
     #########                            #########
