@@ -18,7 +18,7 @@ class utils:
         self.ns = {
             'http': 'http://www.mulesoft.org/schema/mule/http',
             'ee': 'http://www.mulesoft.org/schema/mule/ee/core',
-            'core': 'http://www.mulesoft.org/schema/mule/core'
+            'mule': 'http://www.mulesoft.org/schema/mule/core'
         }
 
     ##############################################
@@ -148,12 +148,28 @@ class utils:
     
     # Find the main flow existing or new
     def isExistingMainFlow(self, projectPath: str, endpoint: str) -> bool:
-        with open(f"{projectPath}\\src\\main\\mule\\{self.getPackageName(projectPath)}.xml", 'r') as file:
-            content = file.read()
-            data = ET.fromstring(content).findall("flow", self.ns)
-        flowNames = [flow.get("name") for flow in data]
-        result = any([self.implFlowName(endpoint) in flowName for flowName in flowNames])
-        return result
+        """
+        Check if a main flow already exists for the given endpoint.
+        
+        Parameters:
+            projectPath (str): Path to the project
+            endpoint (str): The endpoint to check
+            
+        Returns:
+            bool: True if main flow exists, False otherwise
+        """
+        try:
+            with open(f"{projectPath}\\src\\main\\mule\\{self.getPackageName(projectPath)}.xml", 'r') as file:
+                content = file.read()
+                data = ET.fromstring(content).findall("mule:flow", self.ns)
+            
+            flowNames = [flow.get("name") for flow in data]
+            endpoint_pattern = self.slashConverter(endpoint)
+            result = any([endpoint_pattern in flowName for flowName in flowNames])
+            return result
+        except Exception as e:
+            print(f"Error checking for existing main flow: {e}")
+            return False
         
     ##############################################
     #########                            #########
@@ -236,7 +252,7 @@ class utils:
             </http:request-config>
         """
         http_connector_config = f"""
-        <http:request method="${method}" doc:name="Request to {self.sysLoggerMessage(backendUrl, backendType)}"  doc:id="{self.createUuid()}" config-ref="HTTP_Request_configuration_{self.getBackendDetails(backendUrl, 'request').hostname}-config" path='${{{self.backendPropName(backendUrl, 'request', endpoint).get('path')}}}' >
+        <http:request method="{method}" doc:name="Request to {self.sysLoggerMessage(backendUrl, backendType)}"  doc:id="{self.createUuid()}" config-ref="HTTP_Request_configuration_{self.getBackendDetails(backendUrl, 'request').hostname}-config" path='${{{self.backendPropName(backendUrl, 'request', endpoint).get('path')}}}' >
 			<http:headers ><![CDATA[#[%dw 2.0
 output application/json
 ---
