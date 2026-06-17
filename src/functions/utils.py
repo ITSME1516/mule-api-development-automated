@@ -290,7 +290,7 @@ output application/json
             "hostname": f"{self.getBackendDetails(backendUrl, backendType).hostname}.hostname",
             "port": f"{self.getBackendDetails(backendUrl, backendType).hostname}.port",
             "basePath": f"{self.getBackendDetails(backendUrl, backendType).hostname}.basePath",
-            "path": f"{self.getBackendDetails(backendUrl, backendType).hostname}.{self.joinPath(endpoint, '.')}.path",
+            "path": f"{self.getBackendDetails(backendUrl, backendType).hostname}.{self.joinPath(self.getBackendDetails(backendUrl, backendType).path, '.')}.path",
             "connectionTimeout": f"{self.getBackendDetails(backendUrl, backendType).hostname}.connectionTimeout",
             "responseTimeout": f"{self.getBackendDetails(backendUrl, backendType).hostname}.responseTimeout",
             "usePersistentConnections": f"{self.getBackendDetails(backendUrl, backendType).hostname}.usePersistentConnections",

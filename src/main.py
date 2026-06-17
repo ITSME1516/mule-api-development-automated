@@ -1,143 +1,185 @@
+"""
+MuleSoft API Creator - Main Application
+A user-friendly interface for automated MuleSoft API development
+"""
+
 import time
 import streamlit as st
 from functions.apiCreation import apiCreation
-from functions.configCreation import configCreation
-from functions.utils import utils
+from functions.config import ApiConfig, BackendConfig, ComponentConfig
+from ui_helper import (
+    setup_page_config,
+    render_header,
+    render_basic_info_section,
+    render_backend_section,
+    render_components_section,
+    render_summary_section,
+    render_success_message,
+    render_error_message,
+    render_info_message,
+)
 
-apiCreator = apiCreation()
-configCreator = configCreation()
-utilsObj = utils()
+# Page configuration
+setup_page_config()
 
-st.title("MuleSoft API Creation")
-projectPath =  st.text_input("Enter Project Path (e.g., C:/path/to/project):", placeholder="C:/path/to/project")
-endpoint =  st.text_input("Enter API Endpoint (e.g., /Services/flight-service):", placeholder="/Services/flight-service")
-st.markdown("---")
-st.markdown("### Backend Configuration:")
-backendType = st.selectbox("Select Backend Type:", ["HTTP", "Database", "SOAP"])
-if backendType == "HTTP":
-    backendType = "request"
-method = st.selectbox("Select HTTP Method:", ["GET", "POST", "PUT", "DELETE"])
-existingBackend = st.checkbox("Use Existing Backend Configuration", value=True)
-backendUrl = st.text_input("Enter Backend URL:", placeholder="e.g., http://backend-service/api")
+# Initialize session state for better UX
+if "api_created" not in st.session_state:
+    st.session_state.api_created = False
 
-if existingBackend:
-    st.markdown("#### Select Existing Backend Configuration:")
-    # existingConfig = st.text_input("Enter Existing Backend Config Name:", placeholder="e.g., flight-service-config")
-else:
-    if (backendType == "request") :
-        if (len(backendUrl) > 0) and (st.checkbox("Show Auto-Generated Backend Properties")):
-            st.markdown("#### New Backend Configuration:")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("##### Optional Backend Properties:")
-                basePath = st.text_input("Base Path:", placeholder="e.g., /api", value="/*")
-                connectionTimeout = st.text_input("Connection Timeout (ms):", placeholder="e.g., 60000", value="60000")
-                responseTimeout = st.text_input("Response Timeout (ms):", placeholder="e.g., 60000", value="60000")
-                insecure = st.checkbox("Insecure TLS (Skip SSL Validation)", value=True)
-                usePersistentConnections = st.checkbox("Use Persistent Connections", value=True)
-            with col2:
-                st.markdown("##### Auto-Generated Backend Properties:")
-                data = utilsObj.backendPropName(backendUrl, backendType, endpoint)
-                for key, value in data.items():
-                    st.markdown(f"**{key}** : {value}")
-        
+# Create API object
+api_creator = apiCreation()
 
-    else:
-        raise ValueError("Currently, only HTTP backend type is supported for new configurations.")
+# ============================================================================
+# PAGE LAYOUT
+# ============================================================================
 
-st.markdown("---")
-st.markdown("### Select Components to Develop:")
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.markdown("#### Flows:")
-    create_main_flow = st.checkbox("Main Flow", value=True)
-    create_impl_flow = st.checkbox("Implementation Flow", value=True)
-    create_system_flow = st.checkbox("System Flow", value=True)
-with col2:
-    st.markdown("#### Configuration:")
-with col3:
-    st.markdown("#### Test Files")
-with col4:
-    st.markdown("#### Global Config:")
-    create_global_config = st.checkbox("Global Config", value=not existingBackend)
+# Header
+render_header()
 
-st.markdown("---")
-
-col1, col2, col3 = st.columns([4,2,4])
-with col2:
-    createButton = st.button("Create API")
-if createButton:
+# Create main form for all inputs
+with st.form("api_creation_form", clear_on_submit=False):
+    # Section 1: Basic Information
+    project_path, endpoint = render_basic_info_section()
     
-    message_placeholder = st.empty()
-    # Validate at least one component is selected
-    if not (create_main_flow or create_impl_flow or create_system_flow or create_global_config):
-        message_placeholder.error("Please select at least one component to develop.")
-    elif endpoint and projectPath:
-        with st.spinner("Creating API..."):
+    st.markdown("---")
+    
+    # Section 2: Backend Configuration
+    backend_config_data = render_backend_section()
+    
+    st.markdown("---")
+    
+    # Section 3: Components Selection
+    components_data = render_components_section()
+    
+    st.markdown("---")
+    
+    # Create button
+    col1, col2, col3 = st.columns([2, 1, 2])
+    with col2:
+        create_button = st.form_submit_button(
+            "🚀 Create API",
+            use_container_width=True,
+            type="primary"
+        )
+
+# ============================================================================
+# FORM PROCESSING
+# ============================================================================
+
+if create_button:
+    # Debug: Check what components are selected
+    selected_components = [k for k, v in components_data.items() if v and k != "config_properties"]
+    
+    # Validate that at least one field is filled
+    if not project_path.strip() or not endpoint.strip() or not backend_config_data["backend_url"].strip():
+        render_error_message("Please fill in all required fields: Project Path, API Endpoint, and Backend URL")
+    elif not any([components_data.get("main_flow"), components_data.get("impl_flow"), components_data.get("system_flow"), components_data.get("global_config"), components_data.get("config_properties")]):
+        render_error_message("❌ Please select at least one component to develop:\n- Main Flow\n- Implementation Flow\n- System Flow\n- Global Config\n- Config Properties")
+    else:
+        # Auto-enable Global Config if Config Properties is selected
+        if components_data.get("config_properties") and not components_data.get("global_config"):
+            components_data["global_config"] = True
+            render_info_message("ℹ️ Global Config has been automatically enabled (required for Config Properties)")
+        
+        # Create configuration objects
+        backend_config = BackendConfig(
+            backend_type=backend_config_data["backend_type"],
+            backend_url=backend_config_data["backend_url"],
+            method=backend_config_data["method"],
+            base_path=backend_config_data["base_path"],
+            connection_timeout=backend_config_data["connection_timeout"],
+            response_timeout=backend_config_data["response_timeout"],
+            insecure_tls=backend_config_data["insecure_tls"],
+            use_persistent_connections=backend_config_data["use_persistent"],
+            use_existing=backend_config_data["use_existing"],
+        )
+        
+        component_config = ComponentConfig(
+            main_flow=components_data["main_flow"],
+            impl_flow=components_data["impl_flow"],
+            system_flow=components_data["system_flow"],
+            global_config=components_data["global_config"],
+            config_properties=components_data["config_properties"],
+        )
+        
+        api_config = ApiConfig(
+            endpoint=endpoint,
+            project_path=project_path,
+            backend=backend_config,
+            components=component_config,
+        )
+        
+        # Validate configuration
+        is_valid, error_msg = api_config.is_valid()
+        
+        if not is_valid:
+            render_error_message(error_msg)
+        else:
+            # Display configuration summary
+            render_summary_section(api_config.to_dict())
+            
+            # Process API creation
+            # st.markdown("---")
+            progress_placeholder = st.empty()
+            message_placeholder = st.empty()
+            
+            with progress_placeholder.container():
+                st.info("⏳ Processing your API creation request...")
+            
             try:
-                status = apiCreator.createApi(
-                    endpoint, 
-                    projectPath, 
-                    backendUrl, 
-                    method, 
-                    backendType, 
-                    existingBackend,
-                    create_main_flow,
-                    create_impl_flow,
-                    create_system_flow,
-                    create_global_config
-                )
+                # Call API creation with single config object
+                status = api_creator.createApi(api_config)
                 
-                # Display status in centered, clean format
-                with message_placeholder.container():
-                    st.markdown("---")
-                    st.markdown("<h2 style='text-align: center;'>✅ API Created Successfully</h2>", unsafe_allow_html=True)
-                    st.markdown("---")
-                    
-                    # Display component status
-                    col1, col2 = st.columns([1, 1])
-                    
-                    with col1:
-                        st.markdown("<h4 style='text-align: center;'>Main Flow</h4>", unsafe_allow_html=True)
-                        if status["main_flow"] == "Developed":
-                            st.markdown("<p style='text-align: center; color: green; font-size: 18px;'><b>Developed</b></p>", unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"<p style='text-align: center; color: orange; font-size: 18px;'><b>{status['main_flow']}</b></p>", unsafe_allow_html=True)
-                    
-                    with col2:
-                        st.markdown("<h4 style='text-align: center;'>Impl Flow</h4>", unsafe_allow_html=True)
-                        if status["impl_flow"] == "Developed":
-                            st.markdown("<p style='text-align: center; color: green; font-size: 18px;'><b>Developed</b></p>", unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"<p style='text-align: center; color: orange; font-size: 18px;'><b>{status['impl_flow']}</b></p>", unsafe_allow_html=True)
-                    
-                    col3, col4 = st.columns([1, 1])
-                    
-                    with col3:
-                        st.markdown("<h4 style='text-align: center;'>Sys Flow</h4>", unsafe_allow_html=True)
-                        if status["sys_flow"] == "Developed":
-                            st.markdown("<p style='text-align: center; color: green; font-size: 18px;'><b>Developed</b></p>", unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"<p style='text-align: center; color: orange; font-size: 18px;'><b>{status['sys_flow']}</b></p>", unsafe_allow_html=True)
-                    
-                    with col4:
-                        st.markdown("<h4 style='text-align: center;'>Global Config</h4>", unsafe_allow_html=True)
-                        if status["global_config"] == "Developed":
-                            st.markdown("<p style='text-align: center; color: green; font-size: 18px;'><b>Developed</b></p>", unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"<p style='text-align: center; color: orange; font-size: 18px;'><b>{status['global_config']}</b></p>", unsafe_allow_html=True)
-                    
-                    st.markdown("---")
+                # Clear progress message
+                progress_placeholder.empty()
                 
-                # Auto-close after 5 seconds
-                time.sleep(10)
-                message_placeholder.empty()
+                # Display success message
+                render_success_message(status)
+                
+                # Auto-close success message after 15 seconds
+                time.sleep(15)
+                progress_placeholder.empty()
                 
             except ValueError as ve:
-                # Show user-friendly error message in Streamlit
-                message_placeholder.warning(str(ve))
+                progress_placeholder.empty()
+                render_error_message(str(ve))
             except Exception as e:
-                # Show other errors
-                message_placeholder.error(f"An error occurred: {str(e)}")
-    else:
-        message_placeholder.error("Please fill in all fields to create the API.")
+                progress_placeholder.empty()
+                render_error_message(f"An unexpected error occurred: {str(e)}")
+
+# ============================================================================
+# SIDEBAR INFORMATION
+# ============================================================================
+
+with st.sidebar:
+    st.markdown("### 📚 About")
+    st.markdown("""
+    **MuleSoft API Creator** automates the generation of:
+    - API flows (Main, Implementation, System)
+    - Backend configurations
+    - Global configurations
+    
+    This tool saves time and ensures consistency across your API projects.
+    """)
+    
+    st.markdown("---")
+    
+    st.markdown("### 🎯 Quick Tips")
+    st.markdown("""
+    1. **Project Path**: Use absolute path to your Mule project
+    2. **Endpoint**: Start with `/` (e.g., `/Services/resource`)
+    3. **Backend URL**: Include protocol (http/https)
+    4. **Components**: Select all needed components
+    5. **Advanced Settings**: Only change if you know what you're doing
+    """)
+    
+    st.markdown("---")
+    
+    st.markdown("### 🔗 Resources")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📖 Documentation"):
+            st.info("Documentation link would go here")
+    with col2:
+        if st.button("🐛 Report Issue"):
+            st.info("Issue tracking link would go here")

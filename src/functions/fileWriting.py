@@ -102,7 +102,24 @@ def insert_flow_into_xml(project_path: str, flow_code: str, endpoint_url: str, b
 
 #Write Global Configurations
 def insert_global_config(project_path: str, flow_code: str, backend_type: str) -> None:
+    """
+    Insert global configuration into global-config.xml file.
+    
+    Parameters:
+        project_path (str): Path to the project directory.
+        flow_code (str): The configuration XML string to insert.
+        backend_type (str): The type of the backend.
+    
+    Returns:
+        None. The file is updated in place or created if new.
+    
+    Raises:
+        ValueError: If insertion fails.
+    """
     file_path = _get_file_path(project_path, "globalConfig", "", "", backend_type)
     
-    _handle_existing_file(file_path, flow_code, "globalConfig")
+    if os.path.exists(file_path):
+        _handle_existing_file(file_path, flow_code, "globalConfig")
+    else:
+        _handle_new_file(file_path, flow_code, backend_type, "globalConfig")
     
