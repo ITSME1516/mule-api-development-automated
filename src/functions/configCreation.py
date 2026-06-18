@@ -182,13 +182,13 @@ class configCreation():
         
         # Extract backend details from URL
         parsed = utilsObj.getBackendDetails(backendUrl, backendType)
-        protocol = parsed.scheme or "https"
-        port = parsed.port or ("443" if protocol == "https" else "8081")
+        protocol = parsed.scheme or "HTTPS"
+        port = parsed.port or (8081)
         basePath = parsed.path or "/"
         
         # Build properties string with user-provided values or defaults
         properties = f"""\n# {hostname.upper()} PROPERTIES
-{propNames['protocol']}={protocol}
+{propNames['protocol']}={protocol.upper()}
 {propNames['hostname']}={parsed.hostname}
 {propNames['port']}={port}
 {propNames['basePath']}={backendConfig.get('base_path', basePath)}

@@ -1,6 +1,8 @@
 import uuid
 from urllib.parse import urlparse
 import xml.etree.ElementTree as ET
+import os
+import re
 
 class utils:
     """
@@ -297,6 +299,73 @@ output application/json
             "insecure": f"{self.getBackendDetails(backendUrl, backendType).hostname}.insecure",
         }
         return result
+    
+    ################################################
+    #########                              #########
+    ######     Disable Payload Property      ######
+    #########                              #########
+    ################################################
+    
+    def addNewDisablePayloadProp(self, path: str, endpoint: str, propValue: str = "false") -> str:
+        """
+        Add disable payload logger property to dev.properties file.
+        Property value is assigned directly: true/false based on checkbox state.
+        Adds next to the last disable.payload.logs property, or at end if none found.
+        
+        Parameters:
+            path (str): Path to the project directory
+            endpoint (str): The API endpoint string
+            propValue (str): Property value - "true" or "false" (default is "false")
+            
+        Returns:
+            str: Status message
+        """
+        try:
+            # Remove trailing backslash/slash if present
+            path = path.rstrip("\\").rstrip("/")
+            
+            # Standard MuleSoft project structure
+            prop_file = f"{path}\\src\\main\\resources\\config\\dev\\config.properties"
+            
+            if not os.path.exists(prop_file):
+                return f"❌ config.properties file not found at: {prop_file}"
+            
+            with open(prop_file, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            # Build the disable payload property name using the endpoint
+            disable_payload_prop = self.disablePayloadProp(endpoint)
+            
+            # Check if property already exists (exact match) - if so, skip (don't overwrite)
+            if re.search(fr"^{re.escape(disable_payload_prop)}=", content, re.MULTILINE):
+                return f"⚠️ Property already exists: {disable_payload_prop}"
+            
+            # Find all disable.payload.logs lines and get the position after the last one
+            pattern = r".*.disable.payload.logs=.*\n"
+            last_match = None
+            for match in re.finditer(pattern, content):
+                last_match = match
+            
+            if last_match:
+                # Insert after the last disable.payload.logs line
+                insert_pos = last_match.end()
+            else:
+                # If no disable.payload.logs lines found, append at end of file
+                # Ensure content ends with newline before adding new property
+                if not content.endswith("\n"):
+                    content += "\n"
+                insert_pos = len(content)
+            
+            # Insert new property at the determined position
+            content = content[:insert_pos] + f"{disable_payload_prop}={propValue}\n" + content[insert_pos:]
+            
+            with open(prop_file, "w", encoding="utf-8") as f:
+                f.write(content)
+            
+            return f"✅ Disable payload property added: {disable_payload_prop}={propValue}"
+        
+        except Exception as e:
+            return f"❌ Error adding disable payload property: {str(e)}"
     
 
 
