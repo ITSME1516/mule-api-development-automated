@@ -1,7 +1,10 @@
 from .utils import utils
 from functions.flowCreation import flowCreation
+from functions.logger_config import setup_logger
 import os
 import re
+
+logger = setup_logger(__name__)
 
 createFlowObj = flowCreation()
 
@@ -118,11 +121,12 @@ class configCreation():
                 return f"❌ dev.properties file not found at: {prop_file}"
 
             if backendType == "request":
-                with open(prop_file, "r+", encoding="utf-8") as f:
+                with open(prop_file, "r", encoding="utf-8") as f:
                     content = f.read()
                     
                     # Extract property keys from the new properties to check for duplicates
                     prop_keys = re.findall(r"^([^=\n#]+)=", properties, re.MULTILINE)
+                    logger.debug(f"Extracted property keys: {prop_keys}")
                     
                     # Check if any property already exists
                     existing_keys = []
@@ -136,33 +140,46 @@ class configCreation():
                     # Find the last header (e.g., "#SYS-MOBILE-API PROPERTIES")
                     headers = re.findall(r"#.*PROPERTIES", content)
                     if not headers:
-                        raise ValueError("No PROPERTIES header found in dev.properties")
-
-                    last_header = headers[-1]
-                    header_index = content.find(last_header)
-
-                    # From that header onward, look for a blank line separator
-                    after_header = content[header_index:]
-                    match = re.search(r"\n\s*\n", after_header)
-
-                    if match:
-                        # Found a separator → insert before it
-                        insert_pos = header_index + match.start() + 1
-                        finalContent = content[:insert_pos] + properties + content[insert_pos:]
-                    else:
-                        # No separator → append at end of file
+                        # If no header found, append at end of file
+                        logger.info("No PROPERTIES header found, appending at end of file")
                         finalContent = content.rstrip() + "\n" + properties + "\n"
+                    else:
+                        last_header = headers[-1]
+                        header_index = content.find(last_header)
+                        logger.debug(f"Last header found: {last_header} at index {header_index}")
+
+                        # From that header onward, look for a blank line separator
+                        after_header = content[header_index:]
+                        match = re.search(r"\n\s*\n", after_header)
+
+                        if match:
+                            # Found a separator → insert before it
+                            insert_pos = header_index + match.start() + 1
+                            logger.debug(f"Found separator at position {insert_pos}, inserting there")
+                            finalContent = content[:insert_pos] + properties + content[insert_pos:]
+                        else:
+                            # No separator → append at end of file
+                            logger.debug("No separator found after header, appending at end")
+                            finalContent = content.rstrip() + "\n" + properties + "\n"
 
                 # Write back to file
                 with open(prop_file, "w", encoding="utf-8") as f:
                     f.write(finalContent)
+                logger.info(f"Successfully wrote properties to {prop_file}")
 
                 return "✅ Configuration properties added successfully"
             else:
                 raise ValueError(f"Invalid backend type: {backendType}")
                 
         except Exception as e:
-            return f"❌ Error adding config properties: {str(e)}"
+            error_msg = f"Error adding config properties: {str(e)}"
+            # Log error using module-level logger
+            try:
+                logger.error(error_msg, exc_info=True)
+            except:
+                # If logger fails, just print the error
+                print(f"❌ {error_msg}")
+            return f"❌ {error_msg}"
     
     def generateBackendProperties(self, backendUrl: str, endpoint: str, backendConfig: dict) -> str:
         """

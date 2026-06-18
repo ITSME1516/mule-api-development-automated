@@ -353,15 +353,18 @@ class apiCreation():
                             )
                             logger.debug(f"Config properties result: {prop_result}")
                             
-                            if "already exists" in prop_result:
+                            if "already exists" in prop_result.lower():
                                 status["config_properties"] = "Exists"
                                 logger.info("Config properties already exist - skipping")
                             elif "✅" in prop_result:
                                 status["config_properties"] = "Developed"
                                 logger.info("Config properties added successfully")
+                            elif "❌" in prop_result or "error" in prop_result.lower():
+                                status["config_properties"] = "Failed"
+                                logger.error(f"Failed to add config properties: {prop_result}")
                             else:
                                 status["config_properties"] = "Failed"
-                                logger.warning("Failed to add config properties")
+                                logger.warning(f"Unexpected result adding config properties: {prop_result}")
                     except Exception as backend_prop_error:
                         logger.warning(f"Could not add backend properties: {str(backend_prop_error)}", exc_info=True)
                         status["config_properties"] = "Failed"
