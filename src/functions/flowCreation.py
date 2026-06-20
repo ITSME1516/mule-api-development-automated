@@ -28,7 +28,7 @@ class flowCreation():
         createSystemFlow(endpoint, backendUrl, method, whichType) -> str
     """
     
-    def createMainFlow(self, apiName: str, endpoint: str) -> str:
+    def createMainFlow(self, apiName: str, endpoint: str, method: str = "POST") -> str:
         """
         Generate MuleSoft Main Flow XML Definition
         =========================================
@@ -38,6 +38,7 @@ class flowCreation():
         Parameters:
             apiName (str): The name of the API derived from project name (e.g., "flights-api")
             endpoint (str): The API endpoint path (e.g., "/a/b/c" or "/Services/resource")
+            method (str): The HTTP method (GET, POST, PUT, DELETE). Default: "POST"
 
         Returns:
             str: Formatted MuleSoft XML flow string containing:
@@ -46,6 +47,10 @@ class flowCreation():
                  - Flow reference to implementation flow
                  - End logger (logs outgoing response)
                  - Payload masking based on disable_payload_logs property
+
+        Flow Name Format:
+            - GET: get:Services\\flight-list:flights-api-config
+            - POST/PUT/DELETE: post:Services\\flight-list:application\\json:flights-api-config
 
         Architecture:
             Main Flow (entry point)
@@ -58,18 +63,25 @@ class flowCreation():
 
         Example:
             >>> flowGen = flowCreation()
-            >>> xml = flowGen.createMainFlow("flights-api", "/Services/flight-list")
+            >>> xml = flowGen.createMainFlow("flights-api", "/Services/flight-list", "POST")
             >>> # Returns XML with flow name: post:Services\\flight-list:application\\json:flights-api-config
 
         Note:
             - Flow names use backslashes for endpoint path conversion
+            - GET requests: no application/json in flow name
+            - POST/PUT/DELETE: includes application\\json in flow name
             - Payload logging is controlled by disable_payload_logs property
             - Both loggers respect the disable.payload.logs property
         """
-        logger.debug(f"Generating main flow: apiName={apiName}, endpoint={endpoint}")
+        logger.debug(f"Generating main flow: apiName={apiName}, endpoint={endpoint}, method={method}")
+        
+        # Determine method prefix (lowercase) and whether to include application/json
+        method_lower = method.lower() if method else "post"
+        content_type_suffix = ":application\\json" if method_lower != "get" else ""
+        flow_name = f"{method_lower}:{utilsObj.slashCheck(utilsObj.slashConverter(endpoint))}{content_type_suffix}:{apiName}-config"
         
         flowCode = f"""
-    <flow name="post:{utilsObj.slashCheck(utilsObj.slashConverter(endpoint))}:application\\json:{apiName}-config">
+    <flow name="{flow_name}">
         <logger level="INFO" doc:name="Start Main Process - {(endpoint)}" 
                 doc:id="{utilsObj.createUuid()}" 
                 message='#[%dw 2.0
@@ -138,7 +150,7 @@ if (Mule::p("{utilsObj.disablePayloadProp(endpoint)}") default false) {{}} else 
     <sub-flow name="{utilsObj.implFlowName(endpoint)}">
         <ee:transform doc:name="Request Payload Transformation" doc:id="{utilsObj.createUuid()}" >
 			<ee:message >
-				<ee:set-payload resource="dwl/{endpoint}" />
+				<ee:set-payload resource="dwl/{utilsObj.slashConverter(utilsObj.slashCheck(endpoint))}" />
 			</ee:message>
 		</ee:transform>
         <flow-ref doc:name="{utilsObj.sysFlowName(backendUrl, endpoint, whichType)}" doc:id="{utilsObj.createUuid()}" name="{utilsObj.sysFlowName(backendUrl, endpoint, whichType)}"/>

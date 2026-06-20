@@ -23,6 +23,7 @@ class configCreation():
 
     def createRequestConfig(self,project_path: str, backendUrl: str,endpoint : str , backendType:str = "request") -> str:
         if utilsObj.isExistingBackend(project_path, backendUrl, backendType):
+            logger.info(f"Backend configuration already exists for {backendUrl}. Skipping creation.")
             print("Existing backend configuration found. Skipping creation.")
             return None
         else:
@@ -47,6 +48,7 @@ class configCreation():
     def addNewPathInConfigProp(self, path: str, backendHost: str, backendType: str, propKey: str, propValue: str) -> str:
         """
         Add a new path property to dev.properties if backend config already exists.
+        Creates dev.properties file if it doesn't exist.
         
         Parameters:
             path (str): Path to the project directory
@@ -65,11 +67,19 @@ class configCreation():
             # Standard MuleSoft project structure
             prop_file = os.path.join(path, "src", "main", "resources", "config", "dev", "config.properties")
             
-            if not os.path.exists(prop_file):
-                return f"❌ dev.properties file not found at: {prop_file}"
+            # Create directories if they don't exist
+            os.makedirs(os.path.dirname(prop_file), exist_ok=True)
             
-            with open(prop_file, "r", encoding="utf-8") as f:
-                content = f.read()
+            if not os.path.exists(prop_file):
+                # Create a new dev.properties file with default structure
+                default_content = f"# MuleSoft API Configuration Properties\n# Auto-generated configuration\n\n"
+                with open(prop_file, "w", encoding="utf-8") as f:
+                    f.write(default_content)
+                logger.info(f"Created new dev.properties file at {prop_file}")
+                content = default_content
+            else:
+                with open(prop_file, "r", encoding="utf-8") as f:
+                    content = f.read()
 
             if backendType == "request":
                 # Check if property key already exists in file
@@ -79,27 +89,31 @@ class configCreation():
                 # Find the last path line for this backend
                 matches = re.findall(fr"{backendHost}\..*\.path=.*\n", content)
                 if not matches:
-                    return "No existing paths found for this backend"
-
-                lastPath = matches[-1]
-                indexToStart = content.find(lastPath) + len(lastPath)
-
-                # Insert new property right after the last .path line
-                content = content[:indexToStart] + f"{propKey}={propValue}\n" + content[indexToStart:]
+                    # No existing paths found, append to end of file
+                    content = content.rstrip() + f"\n{propKey}={propValue}\n"
+                else:
+                    lastPath = matches[-1]
+                    indexToStart = content.find(lastPath) + len(lastPath)
+                    # Insert new property right after the last .path line
+                    content = content[:indexToStart] + f"{propKey}={propValue}\n" + content[indexToStart:]
                 
                 with open(prop_file, "w", encoding="utf-8") as f:
                     f.write(content)
                 
+                logger.info(f"Path property added successfully to {prop_file}")
                 return "✅ Path property added successfully"
             else:
                 raise ValueError(f"Invalid backend type: {backendType}")
                 
         except Exception as e:
-            return f"❌ Error adding path property: {str(e)}"
+            error_msg = f"Error adding path property: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return f"❌ {error_msg}"
 
     def addNewConfigProp(self, path: str, backendHost: str, backendType: str, properties: str) -> str:
         """
         Add new configuration properties to dev.properties file.
+        Creates dev.properties file if it doesn't exist.
         
         Parameters:
             path (str): Path to the project directory
@@ -117,8 +131,19 @@ class configCreation():
             # Standard MuleSoft project structure
             prop_file = os.path.join(path, "src", "main", "resources", "config", "dev", "config.properties")
             
+            # Create directories if they don't exist
+            os.makedirs(os.path.dirname(prop_file), exist_ok=True)
+            
             if not os.path.exists(prop_file):
-                return f"❌ dev.properties file not found at: {prop_file}"
+                # Create a new dev.properties file with default structure
+                default_content = f"# MuleSoft API Configuration Properties\n# Auto-generated configuration\n\n"
+                with open(prop_file, "w", encoding="utf-8") as f:
+                    f.write(default_content)
+                logger.info(f"Created new dev.properties file at {prop_file}")
+                content = default_content
+            else:
+                with open(prop_file, "r", encoding="utf-8") as f:
+                    content = f.read()
 
             if backendType == "request":
                 with open(prop_file, "r", encoding="utf-8") as f:

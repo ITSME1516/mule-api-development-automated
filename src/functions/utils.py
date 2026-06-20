@@ -139,12 +139,21 @@ class utils:
             bool: True if existing, False if new.
         """
         if backendType == "request":
-            with open(f"{projectPath}\\src\\main\\mule\\common\\global-config.xml", 'r') as file:
-                content = file.read()
-                data = ET.fromstring(content).findall("http:request-config", self.ns)
-            httpRequestConfigNames = [config.get("name") for config in data]
-            result = any([self.getBackendDetails(backendUrl, backendType).hostname in configName for configName in httpRequestConfigNames])
-            return result
+            config_file = f"{projectPath}\\src\\main\\mule\\common\\global-config.xml"
+            # If file doesn't exist, it's a new backend (return False)
+            if not os.path.exists(config_file):
+                return False
+            
+            try:
+                with open(config_file, 'r') as file:
+                    content = file.read()
+                    data = ET.fromstring(content).findall("http:request-config", self.ns)
+                httpRequestConfigNames = [config.get("name") for config in data]
+                result = any([self.getBackendDetails(backendUrl, backendType).hostname in configName for configName in httpRequestConfigNames])
+                return result
+            except Exception as e:
+                # If file exists but is malformed, treat as new backend
+                return False
         else:
             raise ValueError("Define proper backend type")
     
@@ -309,7 +318,7 @@ output application/json
     def addNewDisablePayloadProp(self, path: str, endpoint: str, propValue: str = "false") -> str:
         """
         Add disable payload logger property to dev.properties file.
-        Property value is assigned directly: true/false based on checkbox state.
+        Creates config.properties file if it doesn't exist.
         Adds next to the last disable.payload.logs property, or at end if none found.
         
         Parameters:
@@ -327,11 +336,18 @@ output application/json
             # Standard MuleSoft project structure
             prop_file = f"{path}\\src\\main\\resources\\config\\dev\\config.properties"
             
-            if not os.path.exists(prop_file):
-                return f"❌ config.properties file not found at: {prop_file}"
+            # Create directories if they don't exist
+            os.makedirs(os.path.dirname(prop_file), exist_ok=True)
             
-            with open(prop_file, "r", encoding="utf-8") as f:
-                content = f.read()
+            if not os.path.exists(prop_file):
+                # Create a new config.properties file with default structure
+                default_content = f"# MuleSoft API Configuration Properties\n# Auto-generated configuration\n\n"
+                with open(prop_file, "w", encoding="utf-8") as f:
+                    f.write(default_content)
+                content = default_content
+            else:
+                with open(prop_file, "r", encoding="utf-8") as f:
+                    content = f.read()
             
             # Build the disable payload property name using the endpoint
             disable_payload_prop = self.disablePayloadProp(endpoint)

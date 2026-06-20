@@ -104,6 +104,7 @@ def insert_flow_into_xml(project_path: str, flow_code: str, endpoint_url: str, b
 def insert_global_config(project_path: str, flow_code: str, backend_type: str) -> None:
     """
     Insert global configuration into global-config.xml file.
+    Prevents duplicate backend configurations from being inserted.
     
     Parameters:
         project_path (str): Path to the project directory.
@@ -119,7 +120,26 @@ def insert_global_config(project_path: str, flow_code: str, backend_type: str) -
     file_path = _get_file_path(project_path, "globalConfig", "", "", backend_type)
     
     if os.path.exists(file_path):
-        _handle_existing_file(file_path, flow_code, "globalConfig")
+        # Check if this backend config already exists before inserting
+        try:
+            content = _read_xml_file(file_path)
+            
+            # Extract backend config name from flow_code
+            import re
+            name_match = re.search(r'name="(HTTP_Request_configuration_[^"]+)"', flow_code)
+            if name_match:
+                config_name = name_match.group(1)
+                # Check if this config name already exists in the file
+                if f'name="{config_name}"' in content:
+                    print(f"Backend configuration '{config_name}' already exists. Skipping insertion to prevent duplicates.")
+                    return
+            
+            # If not a duplicate, insert the new configuration
+            _handle_existing_file(file_path, flow_code, "globalConfig")
+        except Exception as e:
+            print(f"Error checking for duplicate global config: {e}")
+            # If error, try to insert anyway (fail gracefully)
+            _handle_existing_file(file_path, flow_code, "globalConfig")
     else:
         _handle_new_file(file_path, flow_code, backend_type, "globalConfig")
     

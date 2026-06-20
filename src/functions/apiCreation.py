@@ -82,12 +82,13 @@ class apiCreation():
         # Extract configuration parameters for easier access
         endpoint = api_config.endpoint
         projectPath = api_config.project_path
+        api_method = api_config.api_method
         backendUrl = api_config.backend.backend_url
         method = api_config.backend.method
         backendType = api_config.backend.backend_type
         existingBackend = api_config.backend.use_existing
         
-        logger.debug(f"Configuration extracted: endpoint={endpoint}, project={projectPath}, backend_url={backendUrl}, method={method}")
+        logger.debug(f"Configuration extracted: endpoint={endpoint}, project={projectPath}, api_method={api_method}, backend_url={backendUrl}, backend_method={method}")
         
         # Get API name from project path
         apiName = utilsObj.getPackageName(projectPath)
@@ -139,7 +140,7 @@ class apiCreation():
             if api_config.components.main_flow:
                 logger.info("Generating main flow XML...")
                 try:
-                    main_flow_xml = createFlowObj.createMainFlow(apiName, endpoint)
+                    main_flow_xml = createFlowObj.createMainFlow(apiName, endpoint, api_method)
                     status["main_flow"] = "Generated"
                     logger.debug("Main flow XML generated successfully")
                 except Exception as e:
@@ -267,6 +268,8 @@ class apiCreation():
                     errors.append(error_msg)
                     status["global_config"] = "Failed"
                     logger.error(f"Failed to write global config: {str(e)}", exc_info=True)
+            elif api_config.components.global_config and backendConfigXml is None:
+                logger.info("Skipping global config file write - backend configuration already exists")
             
             # Report any errors encountered
             if errors:

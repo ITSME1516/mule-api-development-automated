@@ -111,15 +111,17 @@ class ApiConfig:
     Attributes:
         endpoint (str): API endpoint path (e.g., "/Services/flight-service")
         project_path (str): Absolute path to MuleSoft project
+        api_method (str): HTTP method for the API endpoint listener (GET, POST, PUT, DELETE)
         backend (BackendConfig): Backend service configuration
         components (ComponentConfig): Components to create
     
     Example:
-        >>> backend = BackendConfig(backend_type="request", backend_url="http://api.service:8080")
+        >>> backend = BackendConfig(backend_type="request", backend_url="http://api.service:8080", method="POST")
         >>> components = ComponentConfig(main_flow=True, impl_flow=True)
         >>> config = ApiConfig(
         ...     endpoint="/api/resource",
         ...     project_path="C:/mule/projects/my-api",
+        ...     api_method="GET",
         ...     backend=backend,
         ...     components=components
         ... )
@@ -127,6 +129,7 @@ class ApiConfig:
     # Required parameters
     endpoint: str
     project_path: str
+    api_method: str
     
     # Backend configuration
     backend: BackendConfig

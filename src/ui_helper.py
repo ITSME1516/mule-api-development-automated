@@ -65,28 +65,30 @@ def render_header():
     st.markdown("---")
 
 
-def render_basic_info_section() -> tuple[str, str]:
+def render_basic_info_section() -> tuple[str, str, str]:
     """
     Render Basic Information Input Section
     ======================================
-    Collects essential information: project path and API endpoint.
-    Both fields are marked as required (*).
+    Collects essential information: project path, API endpoint, and HTTP method.
+    All fields are marked as required (*).
     
     Returns:
-        tuple: (project_path: str, endpoint: str)
+        tuple: (project_path: str, endpoint: str, method: str)
             - project_path: Absolute path to MuleSoft project
             - endpoint: API endpoint path (e.g., "/Services/resource")
+            - method: HTTP method (GET, POST, PUT, DELETE)
     
     Validation Notes:
-        - Both fields are validated in main.py
+        - All fields are validated in main.py
         - Endpoint should start with /
         - Project path should be absolute
+        - Method must be one of: GET, POST, PUT, DELETE
     """
     logger.debug("Rendering basic information section")
     st.subheader("📋 Basic Information")
     st.markdown("<span style='color: #d32f2f;'>* Required fields</span>", unsafe_allow_html=True)
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         project_path = st.text_input(
@@ -102,7 +104,14 @@ def render_basic_info_section() -> tuple[str, str]:
             help="API endpoint path (must start with /, e.g., /Services/resource-name)"
         )
     
-    return project_path, endpoint
+    with col3:
+        method = st.selectbox(
+            "API Method *",
+            ["GET", "POST", "PUT", "DELETE"],
+            help="HTTP method for the API endpoint"
+        )
+    
+    return project_path, endpoint, method
 
 
 def render_backend_section() -> Dict[str, Any]:
@@ -116,7 +125,7 @@ def render_backend_section() -> Dict[str, Any]:
         dict: Backend configuration with keys:
             - backend_type: str - "request", "database", or "soap"
             - backend_url: str - Full URL with protocol and port
-            - method: str - HTTP method (GET, POST, PUT, DELETE)
+            - method: str - HTTP method for backend communication (GET, POST, PUT, DELETE)
             - use_existing: bool - Use existing backend config
             - base_path: str - Base path for requests
             - connection_timeout: int - Timeout in milliseconds
@@ -128,6 +137,7 @@ def render_backend_section() -> Dict[str, Any]:
     Validation Notes:
         - Backend URL is required and validated
         - Timeouts must be >= 1000 ms
+        - Method here is for backend HTTP requests (separate from API endpoint method)
         - All values are passed to BackendConfig dataclass
     """
     logger.debug("Rendering backend configuration section")
@@ -147,9 +157,9 @@ def render_backend_section() -> Dict[str, Any]:
     
     with col2:
         method = st.selectbox(
-            "HTTP Method",
+            "Backend HTTP Method",
             ["GET", "POST", "PUT", "DELETE"],
-            help="HTTP method used for API calls to backend"
+            help="HTTP method used for API calls to backend service (separate from API endpoint method)"
         )
     
     with col3:

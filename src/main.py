@@ -58,8 +58,8 @@ render_header()
 
 # Create main form for all inputs
 with st.form("api_creation_form", clear_on_submit=False):
-    # Section 1: Basic Information (Project Path, API Endpoint)
-    project_path, endpoint = render_basic_info_section()
+    # Section 1: Basic Information (Project Path, API Endpoint, API Method)
+    project_path, endpoint, api_method = render_basic_info_section()
     
     st.markdown("---")
     
@@ -147,6 +147,7 @@ if create_button:
         api_config = ApiConfig(
             endpoint=endpoint,
             project_path=project_path,
+            api_method=api_method,
             backend=backend_config,
             components=component_config,
         )
